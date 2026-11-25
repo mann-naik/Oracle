@@ -7,7 +7,14 @@ const ORACLE_INSTRUCTIONS = `You are ${ORACLE_NAME}, a clear, helpful, and direc
 - Use bullet points or short steps when explaining something.
 - Always format code inside proper Markdown code blocks.`;
 
-const MODELS = ["gemini-3.5-flash-lite", "gemini-4-hydrogen", "gemini-3.8-flash"];
+// Broad fallback chain across active Gemini 3.5 and 4 models
+const MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-4-hydrogen",
+  "gemini-4-argon",
+  "gemini-3.5-pro",
+];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -32,30 +39,29 @@ export async function POST(req: Request) {
     let lastErrorMessage = "Unknown API error";
 
     for (const model of MODELS) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const response = await ai.models.generateContent({
-            model,
-            contents,
-            config: {
-              systemInstruction: ORACLE_INSTRUCTIONS,
-            },
-          });
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: ORACLE_INSTRUCTIONS,
+          },
+        });
 
-          if (response.text) {
-            return NextResponse.json({ reply: response.text });
-          }
-        } catch (err: unknown) {
-          lastErrorMessage = err instanceof Error ? err.message : String(err);
-          console.warn(`Model ${model} (attempt ${attempt}) failed:`, lastErrorMessage);
-          if (attempt === 1) await sleep(1200);
+        if (response.text) {
+          return NextResponse.json({ reply: response.text });
         }
+      } catch (err: unknown) {
+        lastErrorMessage = err instanceof Error ? err.message : String(err);
+        console.warn(`Model ${model} failed, switching to next:`, lastErrorMessage);
+        // Brief pause before trying the next model in the chain
+        await sleep(400);
       }
     }
 
     return NextResponse.json(
-      { error: `Oracle API Error: ${lastErrorMessage}` },
-      { status: 500 }
+      { error: `All Oracle backup models are currently busy (${lastErrorMessage}). Please try again in a few seconds.` },
+      { status: 503 }
     );
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unexpected server error";
