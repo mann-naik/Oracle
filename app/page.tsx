@@ -35,6 +35,7 @@ import {
   Pencil,
   Mic,
   MicOff,
+  Info,
 } from "lucide-react";
 
 const AGENT_NAME = "Oracle";
@@ -1507,6 +1508,28 @@ export default function OraclePage() {
                   <span>Creative (1.5)</span>
                 </div>
               </div>
+              {/* About Oracle */}
+              <div className={`pt-3 border-t border-inherit space-y-2`}>
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 font-medium">
+                    <Info className="w-3.5 h-3.5 opacity-75" />
+                    <span>About Oracle</span>
+                  </span>
+                  <span className={`font-mono text-[10px] px-2 py-0.5 rounded-md `}>
+                    v1.2.0
+                  </span>
+                </div>
+                <p className="opacity-65 leading-relaxed">
+                  Minimalist AI assistant built with Next.js, Tailwind CSS, and Gemini models with real-time streaming, Markdown &amp; LaTeX math rendering, and automatic model failover.
+                </p>
+                <p className="opacity-55 leading-relaxed">
+                  Chat history, pins, and settings are stored locally in your browser.
+                </p>
+                <div className="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px] opacity-55">
+                  <span>Created by Mann Naik</span>
+                  <span>&copy; 2026 Oracle. All rights reserved.</span>
+                </div>
+              </div>
 
               {/* Export & Clear Actions */}
               <div className="pt-2 border-t border-inherit flex items-center justify-between gap-2">
@@ -1543,3 +1566,4 @@ export default function OraclePage() {
     </div>
   );
 }
+
