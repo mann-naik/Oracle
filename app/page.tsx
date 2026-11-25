@@ -254,6 +254,7 @@ export default function OraclePage() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Load saved settings & chats
@@ -299,6 +300,26 @@ export default function OraclePage() {
       // Ignore
     }
   }, [sessions]);
+
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setModelMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModelMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [modelMenuOpen]);
 
   const isDark =
     settings.theme === "dark" ||
@@ -647,7 +668,7 @@ export default function OraclePage() {
             </button>
 
             {/* Model Switcher Dropdown */}
-            <div className="relative">
+            <div ref={modelMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setModelMenuOpen((v) => !v)}
@@ -671,12 +692,7 @@ export default function OraclePage() {
                 <ChevronDown className="w-3.5 h-3.5 opacity-60" />
               </button>
 
-              {modelMenuOpen && (
-                <>
-                  <div
-                    onClick={() => setModelMenuOpen(false)}
-                    className="fixed inset-0 z-20"
-                  />
+              {modelMenuOpen && (<>
                   <div
                     className={`absolute left-0 mt-2 w-72 rounded-2xl border p-1.5 shadow-xl z-30 ${
                       isDark
@@ -1149,3 +1165,4 @@ export default function OraclePage() {
     </div>
   );
 }
+
