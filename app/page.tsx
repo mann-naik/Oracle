@@ -331,6 +331,7 @@ export default function OraclePage() {
   // UI overlays & scroll state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"general" | "about">("general");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
@@ -961,7 +962,7 @@ export default function OraclePage() {
           <button
             type="button"
             onClick={() => {
-              setSettingsOpen(true);
+              setSettingsTab("general"); setSettingsOpen(true);
               setSidebarOpen(false);
             }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
@@ -1358,7 +1359,7 @@ export default function OraclePage() {
         </footer>
       </div>
 
-      {/* Settings Drawer Modal */}
+            {/* Settings Drawer Modal */}
       {settingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div
@@ -1368,6 +1369,7 @@ export default function OraclePage() {
                 : "bg-white border-zinc-200 text-zinc-900"
             }`}
           >
+            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-inherit">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 opacity-75" />
@@ -1382,188 +1384,275 @@ export default function OraclePage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-5 max-h-[75dvh] overflow-y-auto text-xs">
-              {/* Theme Option */}
-              <div>
-                <label className="block font-medium mb-2">Appearance</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      { id: "light", label: "Light", icon: Sun },
-                      { id: "dark", label: "Dark", icon: Moon },
-                      { id: "system", label: "System", icon: Monitor },
-                    ] as const
-                  ).map((item) => {
-                    const Icon = item.icon;
-                    const active = settings.theme === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() =>
-                          setSettings((s) => ({ ...s, theme: item.id }))
-                        }
-                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border font-medium transition-colors ${
-                          active
-                            ? isDark
-                              ? "bg-zinc-100 text-zinc-950 border-zinc-100"
-                              : "bg-zinc-900 text-white border-zinc-900"
-                            : isDark
-                            ? "bg-white/[0.03] border-white/[0.09] hover:bg-white/[0.07]"
-                            : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
-                        }`}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Font Scale */}
-              <div>
-                <label className="block font-medium mb-2">Text Size</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      { id: "sm", label: "Compact" },
-                      { id: "base", label: "Default" },
-                      { id: "lg", label: "Large" },
-                    ] as const
-                  ).map((sz) => {
-                    const active = settings.fontScale === sz.id;
-                    return (
-                      <button
-                        key={sz.id}
-                        type="button"
-                        onClick={() =>
-                          setSettings((s) => ({ ...s, fontScale: sz.id }))
-                        }
-                        className={`py-2 px-3 rounded-xl border font-medium transition-colors ${
-                          active
-                            ? isDark
-                              ? "bg-zinc-100 text-zinc-950 border-zinc-100"
-                              : "bg-zinc-900 text-white border-zinc-900"
-                            : isDark
-                            ? "bg-white/[0.03] border-white/[0.09] hover:bg-white/[0.07]"
-                            : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
-                        }`}
-                      >
-                        {sz.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Custom System Instructions */}
-              <div>
-                <label className="block font-medium mb-1.5">
-                  Custom Instructions
-                </label>
-                <textarea
-                  rows={3}
-                  value={settings.customInstructions}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      customInstructions: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g., Answer concisely, explain code step-by-step, or act as a senior engineer..."
-                  className={`w-full rounded-xl border p-2.5 outline-none resize-none leading-relaxed ${
-                    isDark
-                      ? "bg-[#0b0c0e] border-white/[0.1] focus:border-white/[0.25]"
-                      : "bg-zinc-50 border-zinc-200 focus:border-zinc-400"
-                  }`}
-                />
-              </div>
-
-              {/* Temperature / Creativity */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="font-medium">Creativity (Temperature)</label>
-                  <span className="font-mono opacity-70">
-                    {settings.temperature.toFixed(1)}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1.5}
-                  step={0.1}
-                  value={settings.temperature}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      temperature: parseFloat(e.target.value),
-                    }))
-                  }
-                  className="w-full accent-zinc-500 cursor-pointer"
-                />
-                <div className="flex justify-between text-[10px] opacity-50 mt-0.5">
-                  <span>Precise (0.0)</span>
-                  <span>Balanced (0.7)</span>
-                  <span>Creative (1.5)</span>
-                </div>
-              </div>
-              {/* About Oracle */}
-              <div className={`pt-3 border-t border-inherit space-y-2`}>
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 font-medium">
-                    <Info className="w-3.5 h-3.5 opacity-75" />
-                    <span>About Oracle</span>
-                  </span>
-                  <span className={`font-mono text-[10px] px-2 py-0.5 rounded-md `}>
-                    v1.2.0
-                  </span>
-                </div>
-                <p className="opacity-65 leading-relaxed">
-                  Minimalist AI assistant built with Next.js, Tailwind CSS, and Gemini models with real-time streaming, Markdown &amp; LaTeX math rendering, and automatic model failover.
-                </p>
-                <p className="opacity-55 leading-relaxed">
-                  Chat history, pins, and settings are stored locally in your browser.
-                </p>
-                <div className="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px] opacity-55">
-                  <span>Created by Mann Naik</span>
-                  <span>&copy; 2026 Oracle. All rights reserved.</span>
-                </div>
-              </div>
-
-              {/* Export & Clear Actions */}
-              <div className="pt-2 border-t border-inherit flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={exportMarkdown}
-                  disabled={messages.length === 0}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border font-medium disabled:opacity-40 ${
-                    isDark
-                      ? "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.09]"
-                      : "bg-zinc-100 hover:bg-zinc-200 border-zinc-200"
-                  }`}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export .md</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSessions([]);
-                    setActiveSessionId("");
-                    setSettingsOpen(false);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 font-medium"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Clear History</span>
-                </button>
-              </div>
+            {/* Settings Navigation Tabs: General | About */}
+            <div
+              className={`flex gap-1 px-5 pt-3 pb-2 border-b border-inherit text-xs font-medium ${
+                isDark ? "bg-white/[0.015]" : "bg-zinc-50/70"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setSettingsTab("general")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+                  settingsTab === "general"
+                    ? isDark
+                      ? "bg-white/[0.1] text-white"
+                      : "bg-zinc-900 text-white"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>General</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab("about")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+                  settingsTab === "about"
+                    ? isDark
+                      ? "bg-white/[0.1] text-white"
+                      : "bg-zinc-900 text-white"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                <Info className="w-3.5 h-3.5" />
+                <span>About</span>
+              </button>
             </div>
+
+            {/* Tab Content */}
+            {settingsTab === "general" ? (
+              <div className="p-5 space-y-5 max-h-[70dvh] overflow-y-auto text-xs">
+                {/* Theme Option */}
+                <div>
+                  <label className="block font-medium mb-2">Appearance</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        { id: "light", label: "Light", icon: Sun },
+                        { id: "dark", label: "Dark", icon: Moon },
+                        { id: "system", label: "System", icon: Monitor },
+                      ] as const
+                    ).map((item) => {
+                      const Icon = item.icon;
+                      const active = settings.theme === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({ ...s, theme: item.id }))
+                          }
+                          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border font-medium transition-colors ${
+                            active
+                              ? isDark
+                                ? "bg-zinc-100 text-zinc-950 border-zinc-100"
+                                : "bg-zinc-900 text-white border-zinc-900"
+                              : isDark
+                              ? "bg-white/[0.03] border-white/[0.09] hover:bg-white/[0.07]"
+                              : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Font Scale */}
+                <div>
+                  <label className="block font-medium mb-2">Text Size</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        { id: "sm", label: "Compact" },
+                        { id: "base", label: "Default" },
+                        { id: "lg", label: "Large" },
+                      ] as const
+                    ).map((sz) => {
+                      const active = settings.fontScale === sz.id;
+                      return (
+                        <button
+                          key={sz.id}
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({ ...s, fontScale: sz.id }))
+                          }
+                          className={`py-2 px-3 rounded-xl border font-medium transition-colors ${
+                            active
+                              ? isDark
+                                ? "bg-zinc-100 text-zinc-950 border-zinc-100"
+                                : "bg-zinc-900 text-white border-zinc-900"
+                              : isDark
+                              ? "bg-white/[0.03] border-white/[0.09] hover:bg-white/[0.07]"
+                              : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
+                          }`}
+                        >
+                          {sz.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom System Instructions */}
+                <div>
+                  <label className="block font-medium mb-1.5">
+                    Custom Instructions
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={settings.customInstructions}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        customInstructions: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g., Answer concisely, explain code step-by-step, or act as a senior engineer..."
+                    className={`w-full rounded-xl border p-2.5 outline-none resize-none leading-relaxed ${
+                      isDark
+                        ? "bg-[#0b0c0e] border-white/[0.1] focus:border-white/[0.25]"
+                        : "bg-zinc-50 border-zinc-200 focus:border-zinc-400"
+                    }`}
+                  />
+                </div>
+
+                {/* Temperature / Creativity */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-medium">Creativity (Temperature)</label>
+                    <span className="font-mono opacity-70">
+                      {settings.temperature.toFixed(1)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1.5}
+                    step={0.1}
+                    value={settings.temperature}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        temperature: parseFloat(e.target.value),
+                      }))
+                    }
+                    className="w-full accent-zinc-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] opacity-50 mt-0.5">
+                    <span>Precise (0.0)</span>
+                    <span>Balanced (0.7)</span>
+                    <span>Creative (1.5)</span>
+                  </div>
+                </div>
+
+                {/* Export & Clear Actions */}
+                <div className="pt-2 border-t border-inherit flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={exportMarkdown}
+                    disabled={messages.length === 0}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border font-medium disabled:opacity-40 ${
+                      isDark
+                        ? "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.09]"
+                        : "bg-zinc-100 hover:bg-zinc-200 border-zinc-200"
+                    }`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export .md</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSessions([]);
+                      setActiveSessionId("");
+                      setSettingsOpen(false);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 font-medium"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear History</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Dedicated About Tab */
+              <div className="p-5 space-y-4 max-h-[70dvh] overflow-y-auto text-xs">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                      isDark
+                        ? "bg-white/[0.06] border-white/[0.1]"
+                        : "bg-zinc-900 border-zinc-900 text-white"
+                    }`}
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-sm">Oracle AI</h4>
+                      <span
+                        className={`font-mono text-[10px] px-2 py-0.5 rounded-md ${
+                          isDark
+                            ? "bg-white/[0.08] text-zinc-200"
+                            : "bg-zinc-100 text-zinc-800"
+                        }`}
+                      >
+                        v1.2.0
+                      </span>
+                    </div>
+                    <p className="opacity-60 mt-0.5">
+                      Fast, minimalist AI assistant
+                    </p>
+                  </div>
+                </div>
+
+                <p className="opacity-75 leading-relaxed">
+                  Built with Next.js, Tailwind CSS, and Gemini models featuring real-time streaming, Markdown &amp; LaTeX math rendering, voice input, and automatic multi-model failover.
+                </p>
+
+                <div
+                  className={`rounded-xl border p-3.5 space-y-2 ${
+                    isDark
+                      ? "bg-white/[0.025] border-white/[0.08]"
+                      : "bg-zinc-50 border-zinc-200"
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <span className="opacity-60">Version</span>
+                    <span className="font-mono font-medium">1.2.0 (2026)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-60">Developer</span>
+                    <span className="font-medium">Mann Naik</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-60">Data Storage</span>
+                    <span>Local browser storage</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-60">License</span>
+                    <span>Proprietary</span>
+                  </div>
+                </div>
+
+                <p className="opacity-55 leading-relaxed">
+                  Your conversations, pinned chats, and preferences are stored locally on your device.
+                </p>
+
+                <div className="pt-3 border-t border-inherit text-center text-[11px] opacity-60">
+                  &copy; 2026 Oracle. All rights reserved.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
