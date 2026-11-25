@@ -7,15 +7,16 @@ const ORACLE_INSTRUCTIONS = `You are ${ORACLE_NAME}, a clear, helpful, and direc
 - Use bullet points or short steps when explaining something.
 - Always format code inside proper Markdown code blocks.`;
 
-// Primary model first, fast backup models if overloaded
-const MODELS = ["gemini-3.5-flash-lite", "gemini-4-hydrogen"];
+const MODELS = ["gemini-3.5-flash-lite", "gemini-4-hydrogen", "gemini-3.8-flash"];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is missing in .env.local." },
+        { error: "Server Error: GEMINI_API_KEY is not set in Vercel Environment Variables." },
         { status: 500 }
       );
     }
@@ -28,31 +29,36 @@ export async function POST(req: Request) {
       parts: [{ text: msg.content }],
     }));
 
-    let lastError: unknown = null;
+    let lastErrorMessage = "Unknown API error";
 
     for (const model of MODELS) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents,
-          config: {
-            systemInstruction: ORACLE_INSTRUCTIONS,
-          },
-        });
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents,
+            config: {
+              systemInstruction: ORACLE_INSTRUCTIONS,
+            },
+          });
 
-        return NextResponse.json({ reply: response.text });
-      } catch (err) {
-        console.warn(`Model ${model} busy/failed, trying next...`);
-        lastError = err;
+          if (response.text) {
+            return NextResponse.json({ reply: response.text });
+          }
+        } catch (err: unknown) {
+          lastErrorMessage = err instanceof Error ? err.message : String(err);
+          console.warn(`Model ${model} (attempt ${attempt}) failed:`, lastErrorMessage);
+          if (attempt === 1) await sleep(1200);
+        }
       }
     }
 
-    throw lastError;
-  } catch (error) {
-    console.error("Oracle API error:", error);
     return NextResponse.json(
-      { error: "All models are busy right now. Please try again in a moment." },
+      { error: `Oracle API Error: ${lastErrorMessage}` },
       { status: 500 }
     );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unexpected server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -45,7 +45,7 @@ export default function OraclePage() {
         ...prev,
         {
           role: "assistant",
-          content: data.reply || "No reply received from Oracle.",
+          content: data.reply || data.error || "No reply received from Oracle.",
         },
       ]);
     } catch {
@@ -53,7 +53,7 @@ export default function OraclePage() {
         ...prev,
         {
           role: "assistant",
-          content: "Connection error. Check that your server is running and GEMINI_API_KEY is valid.",
+          content: "Network error: Could not reach the Oracle backend.",
         },
       ]);
     } finally {
