@@ -1,8 +1,13 @@
 ﻿"use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import {
   ArrowUp,
+  ArrowDown,
   Square,
   Sparkles,
   Copy,
@@ -25,6 +30,11 @@ import {
   Zap,
   Cpu,
   Brain,
+  Search,
+  Pin,
+  Pencil,
+  Mic,
+  MicOff,
 } from "lucide-react";
 
 const AGENT_NAME = "Oracle";
@@ -43,6 +53,7 @@ type ChatSession = {
   title: string;
   messages: Message[];
   updatedAt: number;
+  pinned?: boolean;
 };
 
 type OracleSettings = {
@@ -104,8 +115,8 @@ const STARTER_PROMPTS = [
   },
   {
     icon: FileText,
-    label: "Summarize & structure",
-    prompt: "Explain how streaming APIs work in 5 clear bullet points.",
+    label: "Tables & Math",
+    prompt: "Compare QuickSort, MergeSort, and HeapSort in a Markdown table with Big-O formulas.",
   },
   {
     icon: Compass,
@@ -114,7 +125,65 @@ const STARTER_PROMPTS = [
   },
 ];
 
-function FormattedMessage({
+function CodeBlock({
+  language,
+  code,
+  isDark,
+}: {
+  language: string;
+  code: string;
+  isDark: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Ignore clipboard errors
+    }
+  };
+
+  return (
+    <div
+      className={`rounded-xl overflow-hidden border my-3 ${
+        isDark
+          ? "bg-[#111317] border-white/[0.1]"
+          : "bg-zinc-900 border-zinc-800 text-zinc-100"
+      }`}
+    >
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-white/[0.04] border-b border-white/[0.08] text-[11px] text-zinc-400">
+        <span className="font-mono uppercase tracking-wider">
+          {language || "code"}
+        </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1 hover:text-white transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-400">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3 h-3" />
+              <span>Copy code</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="p-3.5 overflow-x-auto text-xs sm:text-[13px] font-mono leading-relaxed text-zinc-100">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function RichMarkdown({
   content,
   isDark,
   fontScale,
@@ -123,8 +192,6 @@ function FormattedMessage({
   isDark: boolean;
   fontScale: FontScale;
 }) {
-  const [copiedBlock, setCopiedBlock] = useState<number | null>(null);
-
   const textSizeClass =
     fontScale === "sm"
       ? "text-xs sm:text-sm leading-6"
@@ -132,109 +199,116 @@ function FormattedMessage({
       ? "text-base sm:text-lg leading-8"
       : "text-sm sm:text-[15px] leading-7";
 
-  // Split fenced code blocks ```lang ... ```
-  const parts = content.split(/(```[\s\S]*?```)/g);
-
-  const renderInline = (line: string) => {
-    const tokens = line.split(/(\*\*.*?\*\*|`[^`]+`)/g);
-    return tokens.map((tok, i) => {
-      if (tok.startsWith("**") && tok.endsWith("**") && tok.length > 4) {
-        return (
-          <strong key={i} className="font-semibold">
-            {tok.slice(2, -2)}
-          </strong>
-        );
-      }
-      if (tok.startsWith("`") && tok.endsWith("`") && tok.length > 2) {
-        return (
-          <code
-            key={i}
-            className={`px-1.5 py-0.5 rounded text-[0.88em] font-mono ${
-              isDark
-                ? "bg-white/[0.08] text-zinc-100"
-                : "bg-zinc-200/80 text-zinc-900"
-            }`}
-          >
-            {tok.slice(1, -1)}
-          </code>
-        );
-      }
-      return <span key={i}>{tok}</span>;
-    });
-  };
-
-  const copyCode = async (code: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopiedBlock(index);
-      setTimeout(() => setCopiedBlock(null), 1800);
-    } catch {
-      // Ignore
-    }
-  };
-
   return (
-    <div className={`space-y-3 break-words ${textSizeClass}`}>
-      {parts.map((part, idx) => {
-        if (part.startsWith("```") && part.endsWith("```")) {
-          const inner = part.slice(3, -3);
-          const firstNewline = inner.indexOf("\n");
-          const lang =
-            firstNewline !== -1 ? inner.slice(0, firstNewline).trim() : "code";
-          const codeBody =
-            firstNewline !== -1 ? inner.slice(firstNewline + 1) : inner;
-
-          return (
-            <div
-              key={idx}
-              className={`rounded-xl overflow-hidden border my-2 ${
-                isDark
-                  ? "bg-[#111317] border-white/[0.1]"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-100"
+    <div className={`break-words space-y-2.5 ${textSizeClass}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <p className="my-1.5 last:mb-0">{children}</p>,
+          h1: ({ children }) => (
+            <h1 className="text-lg sm:text-xl font-bold mt-4 mb-2">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-base sm:text-lg font-semibold mt-3.5 mb-1.5">
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-sm sm:text-base font-semibold mt-3 mb-1">
+              {children}
+            </h3>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>
+          ),
+          li: ({ children }) => <li className="pl-0.5">{children}</li>,
+          blockquote: ({ children }) => (
+            <blockquote
+              className={`border-l-2 pl-3.5 py-0.5 my-2.5 italic opacity-85 ${
+                isDark ? "border-zinc-500" : "border-zinc-400"
               }`}
             >
-              <div className="flex items-center justify-between px-3.5 py-1.5 bg-white/[0.04] border-b border-white/[0.08] text-[11px] text-zinc-400">
-                <span className="font-mono uppercase tracking-wider">
-                  {lang || "code"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => copyCode(codeBody, idx)}
-                  className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                >
-                  {copiedBlock === idx ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-400" />
-                      <span className="text-emerald-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy code</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <pre className="p-3.5 overflow-x-auto text-xs sm:text-[13px] font-mono leading-relaxed text-zinc-100">
-                <code>{codeBody}</code>
-              </pre>
+              {children}
+            </blockquote>
+          ),
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 text-indigo-400 hover:text-indigo-300"
+            >
+              {children}
+            </a>
+          ),
+          table: ({ children }) => (
+            <div
+              className={`my-3 overflow-x-auto rounded-xl border ${
+                isDark ? "border-white/[0.1]" : "border-zinc-300"
+              }`}
+            >
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                {children}
+              </table>
             </div>
-          );
-        }
-
-        if (!part) return null;
-
-        return (
-          <div key={idx} className="whitespace-pre-wrap">
-            {part.split("\n").map((line, lineIdx, arr) => (
-              <span key={lineIdx}>
-                {renderInline(line)}
-                {lineIdx < arr.length - 1 ? "\n" : ""}
-              </span>
-            ))}
-          </div>
-        );
-      })}
+          ),
+          thead: ({ children }) => (
+            <thead className={isDark ? "bg-white/[0.06]" : "bg-zinc-100"}>
+              {children}
+            </thead>
+          ),
+          th: ({ children }) => (
+            <th
+              className={`px-3 py-2 font-semibold border-b ${
+                isDark ? "border-white/[0.1]" : "border-zinc-300"
+              }`}
+            >
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td
+              className={`px-3 py-2 border-b ${
+                isDark ? "border-white/[0.06]" : "border-zinc-200"
+              }`}
+            >
+              {children}
+            </td>
+          ),
+          code({ className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || "");
+            const raw = String(children).replace(/\n$/, "");
+            const isBlock = Boolean(match) || raw.includes("\n");
+            if (isBlock) {
+              return (
+                <CodeBlock
+                  language={match ? match[1] : "code"}
+                  code={raw}
+                  isDark={isDark}
+                />
+              );
+            }
+            return (
+              <code
+                className={`px-1.5 py-0.5 rounded text-[0.88em] font-mono ${
+                  isDark
+                    ? "bg-white/[0.09] text-zinc-100"
+                    : "bg-zinc-200/80 text-zinc-900"
+                }`}
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -248,16 +322,29 @@ export default function OraclePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
+  // Sidebar search & rename states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+
+  // UI overlays & scroll state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
+  // Voice input state
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+
+  const mainScrollRef = useRef<HTMLElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const recognitionRef = useRef<unknown>(null);
 
-  // Load saved settings & chats
+  // Load saved settings, sessions & detect SpeechRecognition
   useEffect(() => {
     try {
       const savedSettings = localStorage.getItem("oracle_settings_v1");
@@ -280,10 +367,18 @@ export default function OraclePage() {
     setSystemPrefersDark(mq.matches);
     const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
     mq.addEventListener("change", handler);
+
+    const w = window as unknown as {
+      SpeechRecognition?: unknown;
+      webkitSpeechRecognition?: unknown;
+    };
+    if (w.SpeechRecognition || w.webkitSpeechRecognition) {
+      setVoiceSupported(true);
+    }
+
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Save settings
   useEffect(() => {
     try {
       localStorage.setItem("oracle_settings_v1", JSON.stringify(settings));
@@ -292,7 +387,6 @@ export default function OraclePage() {
     }
   }, [settings]);
 
-  // Save sessions
   useEffect(() => {
     try {
       localStorage.setItem("oracle_sessions_v1", JSON.stringify(sessions));
@@ -301,10 +395,14 @@ export default function OraclePage() {
     }
   }, [sessions]);
 
+  // Close model dropdown when clicking/tapping outside or pressing Escape
   useEffect(() => {
     if (!modelMenuOpen) return;
     const handleOutside = (e: MouseEvent | TouchEvent) => {
-      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+      if (
+        modelMenuRef.current &&
+        !modelMenuRef.current.contains(e.target as Node)
+      ) {
         setModelMenuOpen(false);
       }
     };
@@ -328,10 +426,14 @@ export default function OraclePage() {
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const messages = activeSession?.messages || [];
 
+  // Auto-scroll when near bottom or sending new message
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    if (!showScrollBottom) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isLoading, showScrollBottom]);
 
+  // Auto-grow composer textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -339,9 +441,89 @@ export default function OraclePage() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
+  const handleMainScroll = () => {
+    const el = mainScrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBottom(distanceFromBottom > 140);
+  };
+
+  const scrollToBottom = () => {
+    setShowScrollBottom(false);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Voice input toggle
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      try {
+        (recognitionRef.current as { stop?: () => void })?.stop?.();
+      } catch {
+        // Ignore
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const w = window as unknown as {
+      SpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: (event: {
+          resultIndex: number;
+          results: { isFinal: boolean; 0: { transcript: string } }[];
+        }) => void;
+        onerror: () => void;
+        onend: () => void;
+        start: () => void;
+        stop: () => void;
+      };
+      webkitSpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: (event: {
+          resultIndex: number;
+          results: { isFinal: boolean; 0: { transcript: string } }[];
+        }) => void;
+        onerror: () => void;
+        onend: () => void;
+        start: () => void;
+        stop: () => void;
+      };
+    };
+
+    const SpeechRec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    const recognition = new SpeechRec();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    const baseInput = input.trim();
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInput(baseInput ? `${baseInput} ${transcript}` : transcript);
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    recognition.start();
+  };
+
   const startNewChat = () => {
     if (isLoading) stopGenerating();
     setActiveSessionId("");
+    setShowScrollBottom(false);
     setSidebarOpen(false);
   };
 
@@ -351,7 +533,11 @@ export default function OraclePage() {
     setIsLoading(false);
   };
 
-  const updateSessionMessages = (sessionId: string, newMessages: Message[], titleHint?: string) => {
+  const updateSessionMessages = (
+    sessionId: string,
+    newMessages: Message[],
+    titleHint?: string
+  ) => {
     setSessions((prev) => {
       const exists = prev.some((s) => s.id === sessionId);
       if (exists) {
@@ -363,7 +549,7 @@ export default function OraclePage() {
                 updatedAt: Date.now(),
                 title:
                   s.title === "New Chat" && titleHint
-                    ? titleHint.slice(0, 36)
+                    ? titleHint.slice(0, 38)
                     : s.title,
               }
             : s
@@ -372,18 +558,31 @@ export default function OraclePage() {
       return [
         {
           id: sessionId,
-          title: (titleHint || "New Chat").slice(0, 36),
+          title: (titleHint || "New Chat").slice(0, 38),
           messages: newMessages,
           updatedAt: Date.now(),
+          pinned: false,
         },
         ...prev,
       ];
     });
   };
 
-  const submitPrompt = async (promptText: string, overrideHistory?: Message[]) => {
+  const submitPrompt = async (
+    promptText: string,
+    overrideHistory?: Message[]
+  ) => {
     const trimmed = promptText.trim();
     if (!trimmed || isLoading) return;
+
+    if (isListening) {
+      try {
+        (recognitionRef.current as { stop?: () => void })?.stop?.();
+      } catch {
+        // Ignore
+      }
+      setIsListening(false);
+    }
 
     const sessionId = activeSessionId || `chat_${Date.now()}`;
     if (!activeSessionId) setActiveSessionId(sessionId);
@@ -398,6 +597,7 @@ export default function OraclePage() {
 
     updateSessionMessages(sessionId, historyWithPlaceholder, trimmed);
     setInput("");
+    setShowScrollBottom(false);
     setIsLoading(true);
 
     const controller = new AbortController();
@@ -422,7 +622,8 @@ export default function OraclePage() {
           ...historyWithUser,
           {
             role: "assistant",
-            content: errData.error || `Error ${res.status}: Oracle could not respond.`,
+            content:
+              errData.error || `Error ${res.status}: Oracle could not respond.`,
           },
         ]);
         return;
@@ -452,7 +653,7 @@ export default function OraclePage() {
       }
     } catch (err: unknown) {
       if ((err as { name?: string })?.name === "AbortError") {
-        // User stopped generation manually; keep partial text
+        // User stopped manually
       } else {
         updateSessionMessages(sessionId, [
           ...historyWithUser,
@@ -510,15 +711,133 @@ export default function OraclePage() {
     URL.revokeObjectURL(url);
   };
 
+  const togglePinSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, pinned: !s.pinned } : s))
+    );
+  };
+
+  const startRename = (s: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingId(s.id);
+    setRenameDraft(s.title);
+  };
+
+  const saveRename = (id: string) => {
+    const clean = renameDraft.trim();
+    if (clean) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, title: clean } : s))
+      );
+    }
+    setRenamingId(null);
+  };
+
   const deleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSessions((prev) => prev.filter((s) => s.id !== id));
     if (activeSessionId === id) setActiveSessionId("");
   };
 
+  // Filter & split sessions into Pinned and Recent
+  const { pinnedSessions, recentSessions } = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? sessions.filter(
+          (s) =>
+            s.title.toLowerCase().includes(q) ||
+            s.messages.some((m) => m.content.toLowerCase().includes(q))
+        )
+      : sessions;
+
+    return {
+      pinnedSessions: filtered.filter((s) => s.pinned),
+      recentSessions: filtered.filter((s) => !s.pinned),
+    };
+  }, [sessions, searchQuery]);
+
   const currentModel =
     MODEL_OPTIONS.find((m) => m.id === settings.tier) || MODEL_OPTIONS[0];
   const CurrentModelIcon = currentModel.icon;
+
+  const renderSessionRow = (s: ChatSession) => {
+    const isEditing = renamingId === s.id;
+    return (
+      <div
+        key={s.id}
+        onClick={() => {
+          if (!isEditing) {
+            setActiveSessionId(s.id);
+            setShowScrollBottom(false);
+            setSidebarOpen(false);
+          }
+        }}
+        onDoubleClick={(e) => startRename(s, e)}
+        className={`group flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+          s.id === activeSessionId
+            ? isDark
+              ? "bg-white/[0.09] text-white font-medium"
+              : "bg-zinc-200/80 text-zinc-950 font-medium"
+            : isDark
+            ? "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+        }`}
+      >
+        {isEditing ? (
+          <input
+            type="text"
+            autoFocus
+            value={renameDraft}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            onBlur={() => saveRename(s.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveRename(s.id);
+              if (e.key === "Escape") setRenamingId(null);
+            }}
+            className={`flex-1 min-w-0 px-1.5 py-0.5 rounded outline-none text-xs ${
+              isDark
+                ? "bg-zinc-900 text-white border border-white/20"
+                : "bg-white text-zinc-900 border border-zinc-400"
+            }`}
+          />
+        ) : (
+          <>
+            <span className="truncate flex-1 min-w-0">{s.title}</span>
+            <div className="flex items-center gap-0.5 shrink-0 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={(e) => togglePinSession(s.id, e)}
+                title={s.pinned ? "Unpin chat" : "Pin chat"}
+                className={`p-1 rounded hover:bg-white/[0.08] ${
+                  s.pinned ? "text-amber-400 !opacity-100" : ""
+                }`}
+              >
+                <Pin className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => startRename(s, e)}
+                title="Rename chat"
+                className="p-1 rounded hover:bg-white/[0.08]"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => deleteSession(s.id, e)}
+                title="Delete chat"
+                className="p-1 rounded hover:bg-white/[0.08] hover:text-red-400"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -536,7 +855,7 @@ export default function OraclePage() {
         />
       )}
 
-      {/* Left Sidebar (Chat History) */}
+      {/* Left Sidebar (Search, Pin, Rename, History) */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col border-r transition-transform duration-200 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
@@ -571,7 +890,7 @@ export default function OraclePage() {
           </button>
         </div>
 
-        <div className="p-3">
+        <div className="p-3 space-y-2">
           <button
             type="button"
             onClick={startNewChat}
@@ -584,46 +903,57 @@ export default function OraclePage() {
             <Plus className="w-3.5 h-3.5" />
             <span>New Chat</span>
           </button>
+
+          {/* Search Chats Input */}
+          <div
+            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs ${
+              isDark
+                ? "bg-[#14161a] border-white/[0.07] focus-within:border-white/[0.2]"
+                : "bg-zinc-100/80 border-zinc-200 focus-within:border-zinc-400"
+            }`}
+          >
+            <Search className="w-3.5 h-3.5 opacity-50 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search chats..."
+              className="flex-1 min-w-0 bg-transparent outline-none placeholder:opacity-50"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="opacity-50 hover:opacity-100"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-2.5 space-y-1">
-          <p className="px-2 pt-1 pb-1 text-[11px] font-medium uppercase tracking-wider opacity-45">
-            Recent Chats
-          </p>
-          {sessions.length === 0 ? (
-            <p className="px-2 py-3 text-xs opacity-50">
-              No saved chats yet.
-            </p>
-          ) : (
-            sessions.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => {
-                  setActiveSessionId(s.id);
-                  setSidebarOpen(false);
-                }}
-                className={`group flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
-                  s.id === activeSessionId
-                    ? isDark
-                      ? "bg-white/[0.09] text-white font-medium"
-                      : "bg-zinc-200/80 text-zinc-950 font-medium"
-                    : isDark
-                    ? "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
-                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-                }`}
-              >
-                <span className="truncate">{s.title}</span>
-                <button
-                  type="button"
-                  onClick={(e) => deleteSession(s.id, e)}
-                  className="opacity-0 group-hover:opacity-70 hover:!opacity-100 p-0.5 rounded"
-                  aria-label="Delete chat"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))
+        <div className="flex-1 min-h-0 overflow-y-auto px-2.5 space-y-3">
+          {pinnedSessions.length > 0 && (
+            <div className="space-y-1">
+              <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider opacity-45">
+                Pinned
+              </p>
+              {pinnedSessions.map(renderSessionRow)}
+            </div>
           )}
+
+          <div className="space-y-1">
+            <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider opacity-45">
+              {searchQuery ? "Matches" : "Recent Chats"}
+            </p>
+            {recentSessions.length === 0 && pinnedSessions.length === 0 ? (
+              <p className="px-2 py-3 text-xs opacity-50">
+                {searchQuery ? "No matching chats." : "No saved chats yet."}
+              </p>
+            ) : (
+              recentSessions.map(renderSessionRow)
+            )}
+          </div>
         </div>
 
         <div className="p-3 border-t border-inherit">
@@ -646,8 +976,8 @@ export default function OraclePage() {
       </aside>
 
       {/* Main Right Workspace */}
-      <div className="flex-1 min-w-0 flex flex-col h-dvh overflow-hidden">
-        {/* Top Header with Model Switcher & Quick Controls */}
+      <div className="relative flex-1 min-w-0 flex flex-col h-dvh overflow-hidden">
+        {/* Top Header */}
         <header
           className={`shrink-0 flex items-center justify-between px-3 sm:px-6 h-14 border-b backdrop-blur-md z-20 ${
             isDark
@@ -692,54 +1022,53 @@ export default function OraclePage() {
                 <ChevronDown className="w-3.5 h-3.5 opacity-60" />
               </button>
 
-              {modelMenuOpen && (<>
-                  <div
-                    className={`absolute left-0 mt-2 w-72 rounded-2xl border p-1.5 shadow-xl z-30 ${
-                      isDark
-                        ? "bg-[#14161b] border-white/[0.1]"
-                        : "bg-white border-zinc-200"
-                    }`}
-                  >
-                    {MODEL_OPTIONS.map((opt) => {
-                      const Icon = opt.icon;
-                      const selected = opt.id === settings.tier;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setSettings((s) => ({ ...s, tier: opt.id }));
-                            setModelMenuOpen(false);
-                          }}
-                          className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors ${
-                            selected
-                              ? isDark
-                                ? "bg-white/[0.08]"
-                                : "bg-zinc-100"
-                              : isDark
-                              ? "hover:bg-white/[0.04]"
-                              : "hover:bg-zinc-50"
-                          }`}
-                        >
-                          <Icon className="w-4 h-4 mt-0.5 shrink-0 opacity-80" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold">
-                                {opt.name}
-                              </span>
-                              <span className="text-[10px] opacity-60">
-                                {opt.badge}
-                              </span>
-                            </div>
-                            <p className="text-[11px] opacity-60 mt-0.5">
-                              {opt.desc}
-                            </p>
+              {modelMenuOpen && (
+                <div
+                  className={`absolute left-0 mt-2 w-72 rounded-2xl border p-1.5 shadow-xl z-30 ${
+                    isDark
+                      ? "bg-[#14161b] border-white/[0.1]"
+                      : "bg-white border-zinc-200"
+                  }`}
+                >
+                  {MODEL_OPTIONS.map((opt) => {
+                    const Icon = opt.icon;
+                    const selected = opt.id === settings.tier;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setSettings((s) => ({ ...s, tier: opt.id }));
+                          setModelMenuOpen(false);
+                        }}
+                        className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors ${
+                          selected
+                            ? isDark
+                              ? "bg-white/[0.08]"
+                              : "bg-zinc-100"
+                            : isDark
+                            ? "hover:bg-white/[0.04]"
+                            : "hover:bg-zinc-50"
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 mt-0.5 shrink-0 opacity-80" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold">
+                              {opt.name}
+                            </span>
+                            <span className="text-[10px] opacity-60">
+                              {opt.badge}
+                            </span>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
+                          <p className="text-[11px] opacity-60 mt-0.5">
+                            {opt.desc}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -773,7 +1102,11 @@ export default function OraclePage() {
         </header>
 
         {/* Scrollable Chat Area */}
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-6">
+        <main
+          ref={mainScrollRef}
+          onScroll={handleMainScroll}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-6"
+        >
           {messages.length === 0 ? (
             <div className="h-full max-w-2xl mx-auto flex flex-col items-center justify-center text-center py-6">
               <div
@@ -789,7 +1122,7 @@ export default function OraclePage() {
                 How can {AGENT_NAME} help today?
               </h2>
               <p className="text-xs sm:text-sm opacity-60 max-w-md mt-1.5">
-                Running on {currentModel.name}. Stream answers live or customize behavior in Settings.
+                Running on {currentModel.name} with Markdown, LaTeX math, and voice input.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full mt-7 text-left">
@@ -859,7 +1192,7 @@ export default function OraclePage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           {msg.content ? (
-                            <FormattedMessage
+                            <RichMarkdown
                               content={msg.content}
                               isDark={isDark}
                               fontScale={settings.fontScale}
@@ -923,7 +1256,25 @@ export default function OraclePage() {
           )}
         </main>
 
-        {/* Bottom Input Composer */}
+        {/* Floating Scroll-to-Bottom Button */}
+        {showScrollBottom && messages.length > 0 && (
+          <div className="pointer-events-none flex justify-center -mt-11 mb-2 z-10">
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              aria-label="Scroll to bottom"
+              className={`pointer-events-auto p-2 rounded-full border shadow-lg transition-transform hover:scale-105 ${
+                isDark
+                  ? "bg-[#181b20] border-white/[0.15] text-zinc-100"
+                  : "bg-white border-zinc-300 text-zinc-900"
+              }`}
+            >
+              <ArrowDown className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Bottom Input Composer with Voice Input */}
         <footer
           className="shrink-0 px-3 sm:px-6 pt-2"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
@@ -945,9 +1296,36 @@ export default function OraclePage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Message ${currentModel.name}...`}
+              placeholder={
+                isListening
+                  ? "Listening..."
+                  : `Message ${currentModel.name}...`
+              }
               className="flex-1 min-w-0 max-h-40 resize-none bg-transparent outline-none py-1.5 text-sm sm:text-[15px] placeholder:opacity-45 leading-relaxed"
             />
+
+            {voiceSupported && !isLoading && (
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                title={isListening ? "Stop voice input" : "Voice input"}
+                aria-label="Voice input"
+                className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                  isListening
+                    ? "bg-red-500/20 text-red-400 animate-pulse"
+                    : isDark
+                    ? "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]"
+                    : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+                }`}
+              >
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
+            )}
+
             {isLoading ? (
               <button
                 type="button"
@@ -1165,4 +1543,3 @@ export default function OraclePage() {
     </div>
   );
 }
-
