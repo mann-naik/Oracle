@@ -36,7 +36,9 @@ import {
   Mic,
   MicOff,
   Info,
+  RefreshCw,
 } from "lucide-react";
+import SoftwareUpdateTab from "@/components/settings/SoftwareUpdateTab";
 
 const AGENT_NAME = "Oracle";
 
@@ -331,7 +333,7 @@ export default function OraclePage() {
   // UI overlays & scroll state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "about">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "updates" | "about">("general");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
@@ -962,7 +964,8 @@ export default function OraclePage() {
           <button
             type="button"
             onClick={() => {
-              setSettingsTab("general"); setSettingsOpen(true);
+              setSettingsTab("general");
+              setSettingsOpen(true);
               setSidebarOpen(false);
             }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
@@ -972,7 +975,7 @@ export default function OraclePage() {
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>Settings & Theme</span>
+            <span>Settings &amp; Theme</span>
           </button>
         </div>
       </aside>
@@ -1359,7 +1362,7 @@ export default function OraclePage() {
         </footer>
       </div>
 
-            {/* Settings Drawer Modal */}
+      {/* Settings Drawer Modal */}
       {settingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div
@@ -1384,7 +1387,7 @@ export default function OraclePage() {
               </button>
             </div>
 
-            {/* Settings Navigation Tabs: General | About */}
+            {/* Settings Navigation Tabs: General | Software Update | About */}
             <div
               className={`flex gap-1 px-5 pt-3 pb-2 border-b border-inherit text-xs font-medium ${
                 isDark ? "bg-white/[0.015]" : "bg-zinc-50/70"
@@ -1403,6 +1406,20 @@ export default function OraclePage() {
               >
                 <Settings className="w-3.5 h-3.5" />
                 <span>General</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab("updates")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+                  settingsTab === "updates"
+                    ? isDark
+                      ? "bg-white/[0.1] text-white"
+                      : "bg-zinc-900 text-white"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Software Update</span>
               </button>
               <button
                 type="button"
@@ -1578,6 +1595,11 @@ export default function OraclePage() {
                   </button>
                 </div>
               </div>
+            ) : settingsTab === "updates" ? (
+              /* Software Update OTA Tab */
+              <div className="p-5 max-h-[70dvh] overflow-y-auto text-xs">
+                <SoftwareUpdateTab />
+              </div>
             ) : (
               /* Dedicated About Tab */
               <div className="p-5 space-y-4 max-h-[70dvh] overflow-y-auto text-xs">
@@ -1654,5 +1676,3 @@ export default function OraclePage() {
     </div>
   );
 }
-
-
